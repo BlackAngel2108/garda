@@ -1,0 +1,20 @@
+{
+    "name": "C++ Dev Environment",
+    // Указываем, что нужно использовать наш существующий Dockerfile
+    "build": {
+        "dockerfile": "../Dockerfile"
+    },
+    // Рабочая область в контейнере
+    "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+    "workspaceFolder": "/app",
+    // Расширения VS Code, которые нужно автоматически установить в контейнере
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools-extension-pack" // Пакет расширений для C/C++
+            ]
+        }
+    },
+    // Пользователь, под которым будут выполняться команды в контейнере
+    "remoteUser": "root"
+}

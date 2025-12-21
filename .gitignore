@@ -1,0 +1,27 @@
+# Папки сборки
+build/
+
+# Файлы VS Code
+# Игнорируем все, кроме настроек запуска и задач
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+.vs/
+
+# Кэш CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+
+# Сгенерированные файлы
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+
+# Игнорируем ненужные файлы задания
+sms.txt
+task.txt
+Тестовое задание.pdf
