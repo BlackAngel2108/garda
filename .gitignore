@@ -25,3 +25,5 @@ cmake_install.cmake
 sms.txt
 task.txt
 Тестовое задание.pdf
+docker_instructions.md
+docker_theory.md

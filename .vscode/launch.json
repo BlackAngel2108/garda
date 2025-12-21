@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug hello_world",
+            "name": "Debug echo_server",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/hello_world",
+            "program": "${workspaceFolder}/build/echo_server",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -19,7 +19,6 @@
                     "ignoreFailures": true
                 }
             ],
-            // Указываем, что перед запуском отладки нужно выполнить задачу сборки
             "preLaunchTask": "CMake Build"
         }
     ]
