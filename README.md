@@ -9,7 +9,10 @@
 *   **Level 3:** Настройка удаленной разработки в VS Code.
 *   **Level 4:** Инициализация Git-репозитория.
 *   **Level 5:** Разработка HTTP Echo-сервера на C++ с использованием `cpp-httplib`.
-*   ... и далее
+*   **Level 6:** Разработка C++ калькулятора.
+*   **Level 7:** Разработка HTTP Calculator Server.
+*   **Level 8:** Разработка C++ CLI клиента для Calculator Server.
+*   ... и далее (согласно `testovoe.txt`)
 
 ## Требования
 
@@ -17,7 +20,7 @@
 *   **Docker Desktop** (должен быть запущен)
 *   **Visual Studio Code** с установленным расширением [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
 *   **C++ Compiler и CMake** (будут установлены автоматически внутри Dev Container).
-*   **Библиотека `cpp-httplib`** (добавлена как Git-подмодуль в папку `extern/cpp-httplib`).
+*   **Библиотеки:** `cpp-httplib`, `nlohmann/json`, `googletest` (управляются через Git-подмодули или CMake FetchContent).
 
 ## Инструкция по запуску
 
@@ -25,7 +28,7 @@
 
 ### Важный шаг: Инициализация подмодулей
 
-После клонирования репозитория (или если вы уже клонировали его), необходимо инициализировать Git-подмодули, чтобы получить библиотеку `cpp-httplib`:
+После клонирования репозитория (или если вы уже клонировали его), необходимо инициализировать Git-подмодули, чтобы получить все внешние библиотеки:
 
 ```bash
 git submodule update --init --recursive
@@ -56,23 +59,72 @@ git submodule update --init --recursive
     *   **Важно:** Если вы меняли `Dockerfile` или `devcontainer.json`, вам может понадобиться команда **"Dev Containers: Rebuild Container"** через палитру команд (`Ctrl+Shift+P`), чтобы изменения вступили в силу.
     *   Дождитесь, пока VS Code соберет Docker-образ и настроит среду разработки. В первый раз это может занять несколько минут.
 
-5.  **Соберите и запустите Echo-сервер:**
-    *   После того, как проект откроется в контейнере, перейдите на вкладку "Run and Debug" (Выполнение и отладка) в VS Code.
-    *   Нажмите зеленую стрелку "▶" рядом с "Debug echo_server" или просто нажмите `F5`.
-    *   Проект будет автоматически скомпилирован, и вывод сервера (`Server is starting on http://0.0.0.0:8080` и логи запросов) появится в консоли отладки.
+5.  **Соберите проект:**
+    *   После того, как проект откроется в контейнере, откройте терминал VS Code (Terminal -> New Terminal).
+    *   Выполните следующие команды для сборки:
+        ```bash
+        mkdir -p build && cd build
+        cmake ..
+        cmake --build .
+        ```
+    *   Исполняемые файлы будут расположены в `build/bin/` (например, `build/bin/http_server`, `build/bin/calc_client`).
 
-6.  **Протестируйте сервер:**
-    *   Откройте браузер и перейдите по адресу `http://localhost:8080`. Вы увидите приветственное сообщение.
-    *   Для тестирования Echo-функционала откройте терминал **на вашей хост-машине** (не в контейнере) и выполните:
-        *   **Для Git Bash, Linux, macOS:**
+6.  **Запустите HTTP Calculator Server (`http_server`):**
+    *   Из каталога `build` внутри контейнера выполните:
+        ```bash
+        ./bin/http_server
+        ```
+    *   Сервер запустится и будет ожидать подключений на порту `8080`.
+
+7.  **Используйте CLI Client (`calc_client`):**
+    *   Откройте **новый** терминал **на вашей хост-машине** (не в контейнере).
+    *   Используйте `calc_client` для отправки запросов на сервер, работающий в контейнере. Убедитесь, что порт 8080 проброшен (как это обычно настроено в `.devcontainer` или при ручном запуске Docker).
+    *   **Примеры использования `calc_client`:**
+        *   **Команда "echo":**
             ```bash
-            curl -X POST -H "Content-Type: text/plain" -d "Hello from curl!" http://localhost:8080/echo
+            ./garda/build/bin/calc_client -s http://localhost:8080 -c echo
             ```
-        *   **Для PowerShell:**
-            ```powershell
-            Invoke-WebRequest -Uri http://localhost:8080/echo -Method Post -Headers @{"Content-Type" = "text/plain"} -Body "Hello from PowerShell!"
+            Ожидаемый вывод: `echo`
+        *   **Вычисление выражения "2 + 2":**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "2 + 2"
             ```
-        В ответ вы должны получить отправленные данные, а в консоли отладки VS Code увидеть сообщение о полученном запросе.
+            Ожидаемый вывод: `4`
+        *   **Неверное выражение:**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "2 ++ 2"
+            ```
+            Ожидаемый вывод: `Error from server: Invalid expression` (или аналогичное сообщение)
+        
+        *Примечание: Если вы запускаете `calc_client` из другого места или вне смонтированной папки, скорректируйте путь к исполняемому файлу.*
+
+8.  **Запустите тесты:**
+    Тесты запускаются из каталога `build` внутри контейнера.
+    *   **Модульные тесты калькулятора (`calculator_tests`):**
+        ```bash
+        ./bin/calculator_tests
+        ```
+    *   **Интеграционные тесты сервера (`server_tests`):**
+        ```bash
+        ./bin/server_tests
+        ```
+    *   **Интеграционные тесты клиента (`client_tests`):**
+        Для клиентских тестов требуется запущенный mock-сервер.
+        *   Запустите mock-сервер в фоновом режиме:
+            ```bash
+            ./bin/mock_server &
+            ```
+            *Mock-сервер будет прослушивать порт 8081.*
+        *   Запустите клиентские тесты:
+            ```bash
+            ./bin/client_tests
+            ```
+        *   После завершения тестов **обязательно завершите процесс mock-сервера**:
+            ```bash
+            killall mock_server # или найдите PID с помощью `ps aux | grep mock_server` и используйте `kill <PID>`
+            ```
+        
+    *Примечание: Если `mock_server` не завершить, он может занять порт 8081 и помешать будущим запускам тестов или других процессов.*
 
 ### Способ 2: Вручную с использованием Docker
 
@@ -95,22 +147,23 @@ git submodule update --init --recursive
     docker build -t garda-cpp-env .
     ```
 
-4.  **Запустите контейнер в фоновом режиме, пробросив порт 8080:**
+4.  **Запустите контейнер в фоновом режиме, пробросив порты:**
     Эта команда запускает контейнер и монтирует текущую папку проекта в директорию `/app` внутри контейнера.
+    Для корректной работы сервера (8080) и mock-сервера (8081) необходимо пробросить оба порта.
     ```bash
     # Для PowerShell
-    docker run -d -it --name dev_container -p 8080:8080 -v "${PWD}:/app" garda-cpp-env
+    docker run -d -it --name garda_dev_container -p 8080:8080 -p 8081:8081 -v "${PWD}:/app" garda-cpp-env
 
     # Для Git Bash / CMD
-    docker run -d -it --name dev_container -p 8080:8080 -v "%cd%:/app" garda-cpp-env
+    docker run -d -it --name garda_dev_container -p 8080:8080 -p 8081:8081 -v "%cd%:/app" garda-cpp-env
     ```
 
 5.  **Подключитесь к командной строке контейнера:**
     ```bash
-    docker exec -it dev_container bash
+    docker exec -it garda_dev_container bash
     ```
 
-6.  **Скомпилируйте и запустите проект (внутри контейнера):**
+6.  **Скомпилируйте проект (внутри контейнера):**
     После выполнения предыдущей команды вы окажетесь в терминале внутри контейнера. Выполните следующие команды:
     ```bash
     # Создаем папку для сборки и переходим в нее
@@ -119,27 +172,64 @@ git submodule update --init --recursive
     # Конфигурируем проект с помощью CMake
     cmake ..
 
-    # Собираем проект (Echo-сервер)
+    # Собираем проект
     cmake --build .
-
-    # Запускаем приложение (Echo-сервер)
-    ./echo_server
     ```
 
-7.  **Протестируйте сервер:**
-    *   Откройте браузер на хост-машине и перейдите по адресу `http://localhost:8080`.
-    *   Или используйте `curl` на хост-машине:
-        *   **Для Git Bash, Linux, macOS:**
+7.  **Запустите HTTP Calculator Server (`http_server`) (внутри контейнера):**
+    *   Внутри контейнера, из каталога `build`, выполните:
+        ```bash
+        ./bin/http_server
+        ```
+    *   Сервер запустится и будет ожидать подключений на порту `8080`.
+
+8.  **Используйте CLI Client (`calc_client`) (на вашей хост-машине):**
+    *   Откройте **новый** терминал **на вашей хост-машине** (не в контейнере).
+    *   Используйте `calc_client` для отправки запросов на сервер.
+    *   **Примеры использования `calc_client`:**
+        *   **Команда "echo":**
             ```bash
-            curl -X POST -H "Content-Type: text/plain" -d "Hello from curl!" http://localhost:8080/echo
+            ./garda/build/bin/calc_client -s http://localhost:8080 -c echo
             ```
-        *   **Для PowerShell:**
-            ```powershell
-            Invoke-WebRequest -Uri http://localhost:8080/echo -Method Post -Headers @{"Content-Type" = "text/plain"} -Body "Hello from PowerShell!"
+            Ожидаемый вывод: `echo`
+        *   **Вычисление выражения "2 + 2":**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "2 + 2"
+            ```
+            Ожидаемый вывод: `4`
+        *   **Неверное выражение:**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "2 ++ 2"
+            ```
+            Ожидаемый вывод: `Error from server: Invalid expression` (или аналогичное сообщение)
+
+9.  **Запустите тесты (внутри контейнера):**
+    Из каталога `build` внутри контейнера.
+    *   **Модульные тесты калькулятора (`calculator_tests`):**
+        ```bash
+        ./bin/calculator_tests
+        ```
+    *   **Интеграционные тесты сервера (`server_tests`):**
+        ```bash
+        ./bin/server_tests
+        ```
+    *   **Интеграционные тесты клиента (`client_tests`):**
+        *   Запустите mock-сервер в фоновом режиме:
+            ```bash
+            ./bin/mock_server &
+            ```
+            *Mock-сервер будет прослушивать порт 8081.*
+        *   Запустите клиентские тесты:
+            ```bash
+            ./bin/client_tests
+            ```
+        *   После завершения тестов **обязательно завершите процесс mock-сервера**:
+            ```bash
+            killall mock_server # или найдите PID с помощью `ps aux | grep mock_server` и используйте `kill <PID>`
             ```
 
-8.  **Остановка и удаление контейнера (когда закончите):**
+10. **Остановка и удаление контейнера (когда закончите):**
     ```bash
-    docker stop dev_container
-    docker rm dev_container
+    docker stop garda_dev_container
+    docker rm garda_dev_container
     ```
