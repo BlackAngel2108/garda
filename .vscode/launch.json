@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug echo_server",
+            "name": "Debug http_server",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/echo_server",
+            "program": "${workspaceFolder}/build/http_server",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
