@@ -12,12 +12,12 @@ void print_help() {
     std::cout << "Options:" << std::endl;
     std::cout << "  -e <expression>  : Evaluate a mathematical expression (e.g., \"2 + 2\")" << std::endl;
     std::cout << "  -c <command>     : Execute a command (e.g., \"echo\", \"clean\")" << std::endl;
-    std::cout << "  -s <address>     : Specify server address (default: http://garda_server:8080)" << std::endl; // New
+    std::cout << "  -s <address>     : Specify server address (default: http://garda_server:8080)" << std::endl;
     std::cout << "  -h, --help       : Show this help message" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
-    std::string server_url = "http://garda_server:8080"; // Default server URL
+    std::string server_url = "http://garda_server:8080";
     std::string endpoint = "/calculate";
     
     json request_json;
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
                 print_help();
                 return 1;
             }
-        } else if (arg == "-s") { // New option to set server address
+        } else if (arg == "-s") {
             if (i + 1 < argc) {
                 server_url = argv[++i];
             } else {
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Send POST request
-    httplib::Client cli(server_url.c_str()); // Use the potentially updated server_url
+    httplib::Client cli(server_url.c_str());
     if (auto res = cli.Post(endpoint.c_str(), request_json.dump(), "application/json")) {
         if (res->status == 200) {
             try {
@@ -85,8 +85,7 @@ int main(int argc, char* argv[]) {
                     std::cerr << "Error from server: " << response_json["err"].get<std::string>() << std::endl;
                     return 1;
                 } else {
-                    // No 'res' or 'err' - might be for commands like 'clean' that return empty JSON
-                    // Or for Level 9/10 requests that return empty JSON for variable assignment
+                    // Response for commands like 'clean' that return empty JSON or variable assignment
                     std::cout << "Operation successful (no explicit result)." << std::endl;
                 }
             } catch (const json::parse_error& e) {

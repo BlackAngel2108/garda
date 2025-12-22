@@ -14,32 +14,29 @@ if(MSVC)
     # Set Windows SDK Version explicitly
     set(CMAKE_SYSTEM_VERSION 10.0) # This should correspond to the desired Windows SDK
 
-    # Force CMake to only search within its own defined toolchain paths
+    # Limit CMake's search paths to avoid conflicts with other toolchains
     set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
     set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 endif()
 
 project(GardaProject)
 
-# Ensure only MSVC's standard library headers are used on MSVC
+# Ensure proper C runtime library linking for MSVC
 if(MSVC)
-    # Clear system include paths to prevent conflicts with other toolchains (e.g., MinGW)
+    # Clear system include paths to prevent unintended conflicts
     set(CMAKE_SYSTEM_INCLUDE_PATH "")
-    # Ensure not accidentally cross-compiling
+    # Prevent accidental cross-compilation
     set(CMAKE_CROSSCOMPILING_EMULATOR "")
 
-    # For MSVC, explicitly set the C runtime library.
-    # This addresses LNK2038 "RuntimeLibrary mismatch" errors.
+    # Explicitly set the C runtime library to avoid LNK2038 "RuntimeLibrary mismatch" errors.
     # MDd for Debug, MD for Release (Dynamic linking to C runtime)
-    # MTd for Debug, MT for Release (Static linking to C runtime)
-    # The current build is Debug, and gtest_force_shared_crt implies dynamic, so we'll try MDd/MD
     foreach(config IN ITEMS Debug Release RelWithDebInfo MinSizeRel)
         if(config STREQUAL "Debug")
             string(APPEND CMAKE_CXX_FLAGS_${config} " /MDd")
             string(APPEND CMAKE_C_FLAGS_${config} " /MDd")
         else()
             string(APPEND CMAKE_CXX_FLAGS_${config} " /MD")
-            string(APPEND CMAKE_C_FLAGS_${config} " /MD")
+            string(APPEND CCMAKE_C_FLAGS_${config} " /MD")
         endif()
     endforeach()
 endif()
@@ -59,21 +56,9 @@ include(FetchContent)
 add_subdirectory(extern/cpp-httplib)
 
 # --- nlohmann/json (via FetchContent) ---
-# FetchContent_Declare(
-#   nlohmann_json
-#   GIT_REPOSITORY https://github.com/nlohmann/json.git
-#   GIT_TAG v3.10.5 # Pinned to a specific version for reproducibility
-# )
-# FetchContent_MakeAvailable(nlohmann_json)
 add_subdirectory(extern/nlohmann_json)
 
 # --- Google Test (via FetchContent) ---
-# FetchContent_Declare(
-#   googletest
-#   URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip # Release 1.10.0
-# )
-# set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-# FetchContent_MakeAvailable(googletest)
 add_subdirectory(extern/googletest)
 include(GoogleTest)
 

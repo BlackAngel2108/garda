@@ -96,6 +96,30 @@ git submodule update --init --recursive
             ```
             Ожидаемый вывод: `Error from server: Invalid expression` (или аналогичное сообщение)
         
+        *   **Использование переменных (одна строка):**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "var = 2 + 3"
+            ```
+            Ожидаемый вывод: `5`
+
+        *   **Использование переменных (многострочный ввод):**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "foo = 10; bar = foo * 2; bar + 5"
+            ```
+            Ожидаемый вывод: `25`
+
+        *   **Неизвестная переменная:**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -e "unknown_var * 2"
+            ```
+            Ожидаемый вывод: `Error from server: Unknown variable: unknown_var`
+
+        *   **Команда "clean":**
+            ```bash
+            ./garda/build/bin/calc_client -s http://localhost:8080 -c clean
+            ```
+            Ожидаемый вывод: `Operation successful (no explicit result).`
+        
         *Примечание: Если вы запускаете `calc_client` из другого места или вне смонтированной папки, скорректируйте путь к исполняемому файлу.*
 
 8.  **Запустите тесты:**
