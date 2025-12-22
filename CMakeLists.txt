@@ -36,7 +36,7 @@ if(MSVC)
             string(APPEND CMAKE_C_FLAGS_${config} " /MDd")
         else()
             string(APPEND CMAKE_CXX_FLAGS_${config} " /MD")
-            string(APPEND CCMAKE_C_FLAGS_${config} " /MD")
+            string(APPEND CMAKE_C_FLAGS_${config} " /MD")
         endif()
     endforeach()
 endif()
@@ -55,11 +55,19 @@ include(FetchContent)
 # --- cpp-httplib (via submodule) ---
 add_subdirectory(extern/cpp-httplib)
 
-# --- nlohmann/json (via FetchContent) ---
-add_subdirectory(extern/nlohmann_json)
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
-# --- Google Test (via FetchContent) ---
-add_subdirectory(extern/googletest)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG v1.14.0
+)
+FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
 
