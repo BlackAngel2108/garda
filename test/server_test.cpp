@@ -9,68 +9,78 @@
 // Для удобства
 using json = nlohmann::json;
 
-// Test Fixture для интеграционных тестов сервера.
-// Этот класс будет управлять запуском и остановкой сервера для каждого теста.
 class ServerIntegrationTest : public ::testing::Test {
 protected:
     // Эта функция будет вызываться перед каждым тестом
     void SetUp() override {
-        // Находим свободный порт
         port = svr.bind_to_any_port("localhost");
-        
-        // Запускаем сервер в отдельном потоке
+
         server_thread = std::thread([this]() {
-            Calculator calc; 
+            Calculator calculator;
 
-            svr.Post("/echo", [](const httplib::Request &req, httplib::Response &res) {
-                res.set_content(req.body, "text/plain");
-            });
+            // 🔥 LEVEL 11: sessions storage
+            std::unordered_map<
+                std::string,
+                std::map<std::string, double>
+            > sessions;
 
-            svr.Post("/calculate", [&](const httplib::Request &req, httplib::Response &res) {
-                json response_json;
-                // Declare variables map here to be local to each request
-                std::map<std::string, double> variables; 
+            svr.Post("/calculate", [&](const httplib::Request &req,
+                                    httplib::Response &res) {
+                json res_json;
+
                 try {
-                    json request_json = json::parse(req.body);
-                    
-                    if (request_json.contains("cmd")) { // Handle commands first
-                        std::string cmd = request_json["cmd"];
+                    json req_json = json::parse(req.body);
+
+                    // --- SID handling ---
+                    std::string sid = "default";
+                    if (req_json.contains("sid") && req_json["sid"].is_string()) {
+                        sid = req_json["sid"];
+                    }
+
+                    // get session variables (auto-create)
+                    auto& vars = sessions[sid];
+
+                    // --- command ---
+                    if (req_json.contains("cmd")) {
+                        std::string cmd = req_json["cmd"];
+
                         if (cmd == "echo") {
-                            response_json["res"] = "echo";
-                        } else if (cmd == "clean") { // Clear state. For now, clear local variables.
-                            variables.clear(); // Clear variables for this request context.
-                            response_json = json::object(); // Empty JSON response for clean command
-                        } else {
+                            res_json["res"] = "echo";
+                        }
+                        else if (cmd == "clean") {
+                            vars.clear();
+                            res_json = json::object();
+                        }
+                        else {
                             throw std::runtime_error("Unknown command: " + cmd);
                         }
-                    } 
-                    else if (request_json.contains("exp")) {
-                        std::string expression = request_json["exp"];
-                        // Pass the variables map to evaluate
-                        double result = calc.evaluate(expression, variables); 
-                        response_json["res"] = result;
-                    } 
-                    else {
-                        throw std::runtime_error("Invalid JSON format: 'exp' or 'cmd' key is missing.");
                     }
-                } catch (const json::parse_error& e) {
-                    res.status = 400; 
-                    response_json["err"] = "Invalid JSON format: " + std::string(e.what());
-                } catch (const std::exception& e) {
-                    res.status = 400; 
-                    response_json["err"] = e.what();
+                    // --- expression ---
+                    else if (req_json.contains("exp")) {
+                        double result = calculator.evaluate(req_json["exp"], vars);
+                        res_json["res"] = result;
+                    }
+                    else {
+                        throw std::runtime_error("Invalid JSON format");
+                    }
+
+                    res.status = 200;
                 }
-                
-                res.set_content(response_json.dump(), "application/json");
+                catch (const std::exception& e) {
+                    res.status = 400;
+                    res_json["err"] = e.what();
+                }
+
+                res.set_content(res_json.dump(), "application/json");
             });
-            // --- Конец логики сервера ---
 
             svr.listen_after_bind();
         });
 
-        // Даем серверу немного времени на запуск
+        // give server time to start
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+
 
     // Эта функция будет вызываться после каждого теста
     void TearDown() override {
@@ -151,30 +161,6 @@ TEST_F(ServerIntegrationTest, CalculateVariableAssignment) {
     EXPECT_DOUBLE_EQ(res_json["res"], 10.0);
 }
 
-// This test demonstrates that variables are ephemeral per request for Task 9
-// It will pass because the server context for each POST is fresh.
-TEST_F(ServerIntegrationTest, CalculateVariableUsageEphemeral) {
-    httplib::Client cli("localhost", port);
-    json req_json;
-
-    // First, try to assign a variable in one request (this does not persist)
-    req_json["exp"] = "y = 20";
-    auto res_assign = cli.Post("/calculate", req_json.dump(), "application/json");
-    ASSERT_TRUE(res_assign);
-    EXPECT_EQ(res_assign->status, 200);
-
-    // Then, try to use it in a separate request (should fail as it's a new context)
-    req_json["exp"] = "y * 2";
-    auto res_use = cli.Post("/calculate", req_json.dump(), "application/json");
-
-    ASSERT_TRUE(res_use);
-    EXPECT_EQ(res_use->status, 400); // Expected to fail
-    json res_json = json::parse(res_use->body);
-    EXPECT_TRUE(res_json.contains("err"));
-    EXPECT_EQ(res_json["err"], "Unknown variable: y");
-}
-
-
 TEST_F(ServerIntegrationTest, CalculateUnknownVariable) {
     httplib::Client cli("localhost", port);
     json req_json;
@@ -201,6 +187,7 @@ TEST_F(ServerIntegrationTest, CalculateMultiStatement) {
     EXPECT_DOUBLE_EQ(res_json["res"], 11.0);
 }
 
+// ---- Level 10 ----
 TEST_F(ServerIntegrationTest, CleanCommand) {
     httplib::Client cli("localhost", port);
     json req_json;
@@ -229,4 +216,99 @@ TEST_F(ServerIntegrationTest, InvalidVariableName) {
     json res_json = json::parse(res->body);
     EXPECT_TRUE(res_json.contains("err"));
     EXPECT_EQ(res_json["err"], "Invalid variable name: 1var");
+}
+
+TEST_F(ServerIntegrationTest, StatefulVariablesPersist) {
+    httplib::Client cli("localhost", port);
+
+    cli.Post("/calculate", R"({"exp":"pi=3.14"})", "application/json");
+    auto res = cli.Post("/calculate", R"({"exp":"2*pi*3"})", "application/json");
+
+    ASSERT_EQ(res->status, 200);
+    json j = json::parse(res->body);
+    EXPECT_DOUBLE_EQ(j["res"], 18.84);
+}
+
+TEST_F(ServerIntegrationTest, CleanClearsState) {
+    httplib::Client cli("localhost", port);
+
+    cli.Post("/calculate", R"({"exp":"x=5"})", "application/json");
+    cli.Post("/calculate", R"({"cmd":"clean"})", "application/json");
+
+    auto res = cli.Post("/calculate", R"({"exp":"x+1"})", "application/json");
+
+    ASSERT_EQ(res->status, 400);
+    json j = json::parse(res->body);
+    EXPECT_EQ(j["err"], "Unknown variable: x");
+}
+
+
+// ---- Level 11 ----
+
+TEST_F(ServerIntegrationTest, SessionKeepsState) {
+    httplib::Client cli("localhost", port);
+
+    cli.Post("/calculate",
+             R"({"sid":"A","exp":"x=10"})",
+             "application/json");
+
+    auto res = cli.Post("/calculate",
+                        R"({"sid":"A","exp":"x*2"})",
+                        "application/json");
+
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 200);
+
+    json j = json::parse(res->body);
+    EXPECT_DOUBLE_EQ(j["res"], 20.0);
+}
+
+TEST_F(ServerIntegrationTest, SessionsAreIsolated) {
+    httplib::Client cli("localhost", port);
+
+    cli.Post("/calculate",
+             R"({"sid":"A","exp":"x=5"})",
+             "application/json");
+
+    auto res = cli.Post("/calculate",
+                        R"({"sid":"B","exp":"x+1"})",
+                        "application/json");
+
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 400);
+
+    json j = json::parse(res->body);
+    EXPECT_EQ(j["err"], "Unknown variable: x");
+}
+
+TEST_F(ServerIntegrationTest, CleanClearsOnlyOneSession) {
+    httplib::Client cli("localhost", port);
+
+    cli.Post("/calculate",
+             R"({"sid":"A","exp":"x=7"})",
+             "application/json");
+
+    cli.Post("/calculate",
+             R"({"sid":"B","exp":"x=9"})",
+             "application/json");
+
+    cli.Post("/calculate",
+             R"({"sid":"A","cmd":"clean"})",
+             "application/json");
+
+    // A → очищена
+    auto resA = cli.Post("/calculate",
+                          R"({"sid":"A","exp":"x+1"})",
+                          "application/json");
+
+    EXPECT_EQ(resA->status, 400);
+
+    // B → не затронута
+    auto resB = cli.Post("/calculate",
+                          R"({"sid":"B","exp":"x+1"})",
+                          "application/json");
+
+    ASSERT_EQ(resB->status, 200);
+    json j = json::parse(resB->body);
+    EXPECT_DOUBLE_EQ(j["res"], 10.0);
 }
